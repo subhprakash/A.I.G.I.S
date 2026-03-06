@@ -1,0 +1,38 @@
+
+```yaml
+engines:
+
+  python:
+    - name: bandit
+    - name: semgrep
+
+  javascript:
+    - name: eslint
+    - name: npm-audit
+
+  java:
+    - name: checkstyle
+    - name: spotbugs
+
+  c_cpp:
+    - name: cppcheck
+    - name: flawfinder
+
+  ruby:
+    - name: brakeman
+
+  go:
+    - name: gosec
+
+binary:
+
+  - binwalk
+  - strings
+  - radare2
+  - yara
+
+web:
+
+  - zap
+  - nikto
+  - nmap
