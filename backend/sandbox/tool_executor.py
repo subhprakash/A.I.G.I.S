@@ -1,5 +1,5 @@
-from sandbox.docker_runner import run_tool
-from orchestrator.task_builder import get_tools
+from backend.sandbox.docker_runner import run_tool
+from backend.orchestrator.task_builder import get_tools
 
 
 def execute_security_tests(path, language):

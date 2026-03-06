@@ -1,6 +1,6 @@
-from reporting.pdf_exporter import export_pdf
-from database.database import SessionLocal
-from database.models import Report
+from backend.reporting.pdf_exporter import export_pdf
+from backend.database.database import SessionLocal
+from backend.database.models import Report
 
 
 def generate_report(job_id, results, remediation, score):

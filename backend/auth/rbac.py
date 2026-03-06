@@ -1,5 +1,5 @@
 from fastapi import Depends, HTTPException
-from auth.dependencies import get_current_user
+from backend.auth.dependencies import get_current_user
 
 
 def require_role(role):

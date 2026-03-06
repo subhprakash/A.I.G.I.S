@@ -1,16 +1,10 @@
 from fastapi import FastAPI
-from api.router import api_router
-from database.database import engine
-from database.models import Base
+from backend.api.router import api_router
+from backend.database.database import engine
+from backend.database.models import Base
 
-app = FastAPI(
-    title="AIGIS",
-    description="Autonomous Intelligent Guard & Inspection System",
-    version="1.0"
-)
+app = FastAPI(title="AIGIS")
 
-@app.on_event("startup")
-def startup():
-    Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app.include_router(api_router)

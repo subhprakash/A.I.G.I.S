@@ -1,4 +1,4 @@
-from workers.tasks import run_scan_task
+from backend.workers.tasks import run_scan_task
 
 
 def dispatch(job_id, path):

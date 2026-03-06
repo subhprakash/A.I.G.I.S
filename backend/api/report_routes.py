@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi.responses import FileResponse
-from database.database import SessionLocal
-from database.models import Report
+from backend.database.database import SessionLocal
+from backend.database.models import Report
 
 router = APIRouter()
 

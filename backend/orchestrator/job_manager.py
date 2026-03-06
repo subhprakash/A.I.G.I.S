@@ -1,9 +1,9 @@
 import os
 import uuid
 
-from database.models import ScanJob
-from workers.tasks import run_scan_task
-from orchestrator.input_detector import detect_input_type
+from backend.database.models import ScanJob
+from backend.workers.tasks import run_scan_task
+from backend.orchestrator.input_detector import detect_input_type
 
 
 UPLOAD_DIR = "/tmp/aigis_uploads"

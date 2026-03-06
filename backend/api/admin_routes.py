@@ -3,9 +3,9 @@ import secrets
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from database.database import get_db
-from database.models import APIKey
-from auth.rbac import require_role
+from backend.database.database import get_db
+from backend.database.models import APIKey
+from backend.auth.rbac import require_role
 
 router = APIRouter()
 

@@ -21,20 +21,41 @@ services:
   backend:
     build: .
     container_name: aigis-backend
+    restart: always
     ports:
       - "8000:8000"
     depends_on:
       - postgres
       - redis
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   worker:
     build: .
-    command: celery -A workers.celery_app.celery worker --loglevel=info
+    container_name: aigis-worker
+    command: celery -A backend.workers.celery_app:celery worker --loglevel=info
+    restart: always
     depends_on:
       - backend
       - redis
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   ollama:
     image: ollama/ollama
+    container_name: ollama
+    restart: always
     ports:
       - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    entrypoint: >
+      /bin/sh -c "
+      ollama serve &
+      sleep 5 &&
+      ollama pull llama3 &&
+      wait
+      "
+
+volumes:
+  ollama_data:

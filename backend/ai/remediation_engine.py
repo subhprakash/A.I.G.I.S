@@ -1,4 +1,4 @@
-from ai.ollama_client import query_llm
+from backend.ai.ollama_client import query_llm
 
 
 def generate_remediation(results):

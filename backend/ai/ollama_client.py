@@ -1,5 +1,5 @@
 import requests
-from config import settings
+from backend.config import settings
 
 
 def query_llm(prompt):

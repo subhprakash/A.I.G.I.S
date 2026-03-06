@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 
-from api.auth_routes import router as auth_router
-from api.scan_routes import router as scan_router
-from api.report_routes import router as report_router
-from api.admin_routes import router as admin_router
+from backend.api.auth_routes import router as auth_router
+from backend.api.scan_routes import router as scan_router
+from backend.api.report_routes import router as report_router
+from backend.api.admin_routes import router as admin_router
 
 api_router = APIRouter(prefix="/api")
 

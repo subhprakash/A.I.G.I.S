@@ -1,5 +1,5 @@
 import yaml
-from utils.yaml_loader import load_yaml
+from backend.utils.yaml_loader import load_yaml
 
 
 TOOLS_CONFIG = "config/tools.yaml"

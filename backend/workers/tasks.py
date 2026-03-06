@@ -1,11 +1,11 @@
-from workers.celery_app import celery
-from sandbox.tool_executor import execute_security_tests
-from security.cvss_engine import compute_cvss
-from ai.remediation_engine import generate_remediation
-from reporting.report_generator import generate_report
+from backend.workers.celery_app import celery
+from backend.sandbox.tool_executor import execute_security_tests
+from backend.security.cvss_engine import compute_cvss
+from backend.ai.remediation_engine import generate_remediation
+from backend.reporting.report_generator import generate_report
 
-from database.database import SessionLocal
-from database.models import ScanResult, ScanJob
+from backend.database.database import SessionLocal
+from backend.database.models import ScanResult, ScanJob
 
 
 @celery.task
