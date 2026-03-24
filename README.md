@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="AIGIS%20Logo%201.jpg" alt="AIGIS Logo" width="350"/>
+  <img src="AIGIS Logo.png" alt="AIGIS Logo" width="350"/>
 </div>
 
 <h1 align="center">🛡️ A.I.G.I.S (Autonomous Intelligence & Guard Inspection System)</h1>
