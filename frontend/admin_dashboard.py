@@ -20,6 +20,7 @@ def show():
         [
             "🏠 Overview",
             "📁 File Scan",
+            "🗜️ ZIP Scan",
             "🌐 URL Scan",
             "📦 Repository Scan",
             "📜 My Reports",
@@ -34,6 +35,12 @@ def show():
         from user_dashboard import page_file_scan, show_active_jobs_banner
         show_active_jobs_banner()
         page_file_scan()
+        return
+
+    if page == "🗜️ ZIP Scan":
+        from user_dashboard import page_zip_scan, show_active_jobs_banner
+        show_active_jobs_banner()
+        page_zip_scan()
         return
 
     if page == "🌐 URL Scan":
@@ -130,7 +137,7 @@ def show():
         st.markdown("---")
         st.markdown("""
         **Admin capabilities:**
-        - Run file, URL, and repository scans
+        - Run file, ZIP, URL, and repository scans
         - View and manage all registered users
         - View all scan jobs across all users grouped by user
         - Download any report from any user

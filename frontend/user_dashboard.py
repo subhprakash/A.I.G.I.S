@@ -342,6 +342,70 @@ def page_file_scan():
                 st.error(f"Error: {e}")
 
 
+def page_zip_scan():
+    st.header("🗜️ ZIP Archive Scan")
+    st.caption(
+        "Upload a .zip archive. Each file inside is safely extracted "
+        "and scanned individually. All findings are aggregated into a single PDF."
+    )
+
+    active_jobs = _get_active_jobs()
+    existing_job = active_jobs.get("zip")
+
+    if existing_job:
+        data = _check_job_status(existing_job)
+        status = data.get("status", "")
+        if status == "completed":
+            st.success("✅ Previous ZIP scan complete!")
+            result = data.get("result", {})
+            show_scan_result(result, existing_job)
+            _clear_active_job("zip")
+            return
+        elif status in ("pending", "running"):
+            st.info(f"Resuming ZIP scan — Job ID: `{existing_job}`")
+            result = poll_until_complete(existing_job, "zip")
+            show_scan_result(result, existing_job)
+            return
+        else:
+            _clear_active_job("zip")
+
+    uploaded_file = st.file_uploader(
+        "Choose a .zip file to scan",
+        type=["zip"]
+    )
+    if uploaded_file:
+        st.info(f"Ready to scan: **{uploaded_file.name}**")
+        if st.button("🚀 Start ZIP Scan", use_container_width=True):
+            try:
+                files = {
+                    "file": (uploaded_file.name, uploaded_file.getvalue())
+                }
+                resp = requests.post(
+                    f"{BACKEND_URL}/api/scan/upload/zip",
+                    files=files,
+                    headers=auth_headers(),
+                    timeout=30
+                )
+                if resp.status_code == 401:
+                    st.error("Session expired.")
+                    st.session_state.clear()
+                    st.rerun()
+                elif resp.status_code == 429:
+                    st.error("Too many scans. Please wait a moment.")
+                elif resp.status_code == 200:
+                    job_id = resp.json().get("job_id")
+                    _set_active_job("zip", job_id)
+                    st.info(f"ZIP scan queued — Job ID: `{job_id}`")
+                    result = poll_until_complete(job_id, "zip")
+                    show_scan_result(result, job_id)
+                else:
+                    st.error(f"Upload failed: {resp.text}")
+            except requests.exceptions.ConnectionError:
+                st.error("Cannot connect to backend.")
+            except Exception as e:
+                st.error(f"Error: {e}")
+
+
 def page_url_scan():
     st.header("🌐 URL / Web Application Scan")
     st.caption(
@@ -609,6 +673,7 @@ def show():
         [
             "🏠 Overview",
             "📁 File Scan",
+            "🗜️ ZIP Scan",
             "🌐 URL Scan",
             "📦 Repository Scan",
             "📜 My Reports"
@@ -623,6 +688,7 @@ def show():
 
         **What you can scan:**
         - 📁 **Files** — Python, JS, Java, C/C++, Go, Ruby, PHP, Binaries
+        - 🗜️ **ZIPs** — Archives up to 500MB, up to 100 files
         - 🌐 **URLs** — nikto, nmap, whatweb, wafw00f
         - 📦 **Repos** — semgrep, gitleaks, trufflehog
 
@@ -640,6 +706,8 @@ def show():
 
     elif page == "📁 File Scan":
         page_file_scan()
+    elif page == "🗜️ ZIP Scan":
+        page_zip_scan()
     elif page == "🌐 URL Scan":
         page_url_scan()
     elif page == "📦 Repository Scan":
