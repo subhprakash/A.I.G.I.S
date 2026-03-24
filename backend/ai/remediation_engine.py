@@ -1,71 +1,77 @@
 from backend.ai.ollama_client import query_llm
+from backend.ai.remediation_fallbacks import get_fallback
 from backend.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Cap at 10 vulns for AI remediation within the 5-minute budget.
-# At ~8s per call sequentially, 10 vulns = ~80s for AI.
-# Total budget: ~60s scanning + ~80s AI + ~10s PDF = ~2.5 minutes.
-MAX_REMEDIATION_VULNS = 10
+# Sequential cap — Ollama processes one request at a time internally.
+# At ~8s per call, 10 vulns ≈ 80s. Beyond this the session budget is
+# exhausted; remaining vulns get static remediations instead.
+MAX_LLM_VULNS = 10
 
 
 def generate_remediation(vulnerabilities: list) -> list:
     """
-    Call Ollama sequentially for each vulnerability.
+    Attach a remediation string to every vulnerability dict.
 
-    Why sequential instead of parallel:
-    Ollama processes one request at a time internally. Parallel calls
-    queue up and each one waits for the previous to finish before
-    generation even starts. With a 45s timeout, queued calls time out
-    before Ollama touches them. Sequential calls with a 90s timeout
-    means every call gets its full generation time without queue penalty.
+    Strategy (in order):
+      1. Try Ollama LLM for up to MAX_LLM_VULNS findings.
+      2. If Ollama returns empty/fails → use static fallback (always succeeds).
+      3. Findings beyond the cap → skip LLM, use static fallback directly.
+
+    This guarantees every finding in the report has a meaningful remediation,
+    regardless of whether Ollama is running.
     """
     if not vulnerabilities:
         return vulnerabilities
 
-    to_remediate = vulnerabilities[:MAX_REMEDIATION_VULNS]
-    skipped = vulnerabilities[MAX_REMEDIATION_VULNS:]
+    llm_batch  = vulnerabilities[:MAX_LLM_VULNS]
+    static_batch = vulnerabilities[MAX_LLM_VULNS:]
 
     logger.info(
-        f"[AIGIS] Remediating {len(to_remediate)} vulns sequentially. "
-        f"{len(skipped)} skipped (cap reached)."
+        f"[AIGIS] Remediating {len(llm_batch)} vulns via LLM, "
+        f"{len(static_batch)} via static fallback (cap={MAX_LLM_VULNS})."
     )
 
-    for i, vuln in enumerate(to_remediate):
+    # ── LLM batch ─────────────────────────────────────────────────────────────
+    for i, vuln in enumerate(llm_batch):
         logger.info(
-            f"[AIGIS] Remediating {i+1}/{len(to_remediate)}: "
+            f"[AIGIS] Remediating {i+1}/{len(llm_batch)}: "
             f"[{vuln.get('tool')}] {vuln.get('test_id', '')} "
             f"— {vuln.get('severity', '').upper()}"
         )
         try:
-            vuln["remediation"] = _remediate_single(vuln)
+            llm_result = _try_llm(vuln)
+            if llm_result:
+                vuln["remediation"] = llm_result
+                logger.debug(f"[AIGIS] LLM remediation OK for {vuln.get('test_id')}")
+            else:
+                # LLM unavailable or returned nothing — use static
+                vuln["remediation"] = _static(vuln)
+                logger.info(
+                    f"[AIGIS] LLM empty for {vuln.get('test_id')} "
+                    f"— using static fallback."
+                )
         except Exception as e:
-            logger.warning(f"[AIGIS] Remediation failed for vuln {i}: {e}")
-            vuln["remediation"] = "Remediation unavailable — LLM error."
+            logger.warning(f"[AIGIS] Remediation error for vuln {i}: {e}")
+            vuln["remediation"] = _static(vuln)
 
-    for vuln in skipped:
-        vuln["remediation"] = (
-            "Remediation not generated — vulnerability cap reached. "
-            "See full report for details."
-        )
+    # ── Static batch (beyond cap) ─────────────────────────────────────────────
+    for vuln in static_batch:
+        vuln["remediation"] = _static(vuln)
 
-    return to_remediate + skipped
+    return llm_batch + static_batch
 
 
-def _remediate_single(vuln: dict) -> str:
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+def _try_llm(vuln: dict) -> str:
     """
-    Short, focused prompt — fewer tokens = faster Ollama response.
-    Previous prompt was too long, causing slow generation.
+    Call Ollama. Returns the response string, or '' if unavailable.
+    ollama_client.query_llm() already returns '' on any failure,
+    so we just pass that through.
     """
-    # Clean the location — strip internal container path
-    location = vuln.get("location", "unknown")
-    if "/app/uploads/" in location:
-        # e.g. /app/uploads/uuid_filename.py:13 → filename.py:13
-        parts = location.split("/app/uploads/")[-1]
-        # Strip UUID prefix (36 chars + underscore)
-        if len(parts) > 37 and parts[36] == "_":
-            parts = parts[37:]
-        location = parts
+    location = _clean_location(vuln.get("location", "unknown"))
 
     prompt = (
         f"Security vulnerability found:\n"
@@ -81,4 +87,22 @@ def _remediate_single(vuln: dict) -> str:
     )
 
     response = query_llm(prompt)
-    return response.strip() if response else "No remediation available."
+    return response.strip() if response else ""
+
+
+def _static(vuln: dict) -> str:
+    """Return the best static remediation for this vulnerability."""
+    return get_fallback(
+        test_id=vuln.get("test_id", ""),
+        cwe=vuln.get("cwe", ""),
+    )
+
+
+def _clean_location(location: str) -> str:
+    """Strip internal container paths from location strings."""
+    if "/app/uploads/" in location:
+        parts = location.split("/app/uploads/")[-1]
+        if len(parts) > 37 and parts[36] == "_":
+            parts = parts[37:]
+        return parts
+    return location

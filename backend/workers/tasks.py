@@ -15,16 +15,18 @@ from backend.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+# ── DB helper ─────────────────────────────────────────────────────────────────
+
 def _write_scan_job(input_name, input_type, status, user_id=None):
     try:
         from backend.database.database import SessionLocal
         from backend.database.models import ScanJob
-        db = SessionLocal()
+        db  = SessionLocal()
         job = ScanJob(
             input_name=input_name,
             input_type=input_type,
             status=status,
-            user_id=user_id if hasattr(ScanJob, 'user_id') else None,
+            user_id=user_id if hasattr(ScanJob, "user_id") else None,
         )
         db.add(job)
         db.commit()
@@ -33,15 +35,20 @@ def _write_scan_job(input_name, input_type, status, user_id=None):
         logger.warning(f"[AIGIS] Could not write ScanJob: {e}")
 
 
-# ── File scan ──────────────────────────────────────────────────────────────────
+def _strip_uuid_prefix(filename: str) -> str:
+    """Remove the '<uuid>_' prefix that job uploads prepend."""
+    if len(filename) > 37 and filename[36] == "_":
+        return filename[37:]
+    return filename
+
+
+# ── File scan ─────────────────────────────────────────────────────────────────
 
 @celery.task(name="backend.workers.tasks.run_scan_task", bind=True)
 def run_scan_task(self, file_path: str, user_id: int = None):
-    logger.info(f"[AIGIS] Starting file scan for: {file_path}")
+    logger.info(f"[AIGIS] Starting file scan: {file_path}")
 
-    filename = os.path.basename(file_path)
-    if len(filename) > 37 and filename[36] == "_":
-        filename = filename[37:]
+    filename = _strip_uuid_prefix(os.path.basename(file_path))
 
     if not os.path.exists(file_path):
         _write_scan_job(filename, "file", "failed", user_id)
@@ -50,26 +57,26 @@ def run_scan_task(self, file_path: str, user_id: int = None):
     _write_scan_job(filename, "file", "running", user_id)
 
     try:
-        raw_results = dispatch(file_path)
-        vulnerabilities = parse_vulnerabilities(raw_results)
-        scored = score_vulnerabilities(vulnerabilities)
-        remediated = generate_remediation(scored)
+        raw_results  = dispatch(file_path)
+        vulns        = parse_vulnerabilities(raw_results)
+        scored       = score_vulnerabilities(vulns)
+        remediated   = generate_remediation(scored)
 
-        report_path = generate_report(
+        report_path  = generate_report(
             job_id=self.request.id,
             vulnerabilities=remediated,
             scan_type="file",
             target=file_path,
-            user_id=user_id
+            user_id=user_id,
         )
 
         _write_scan_job(filename, "file", "completed", user_id)
         logger.info("[AIGIS] File scan completed")
         return {
-            "status": "completed",
-            "file": file_path,
-            "report": report_path,
-            "vulnerabilities": len(remediated)
+            "status":          "completed",
+            "file":            file_path,
+            "report":          report_path,
+            "vulnerabilities": len(remediated),
         }
 
     except Exception as e:
@@ -78,11 +85,11 @@ def run_scan_task(self, file_path: str, user_id: int = None):
         return {"status": "failed", "error": str(e), "file": file_path}
 
 
-# ── URL scan ───────────────────────────────────────────────────────────────────
+# ── URL scan ──────────────────────────────────────────────────────────────────
 
 @celery.task(name="backend.workers.tasks.run_url_scan_task", bind=True)
 def run_url_scan_task(self, url: str, user_id: int = None):
-    logger.info(f"[AIGIS] Starting URL scan for: {url}")
+    logger.info(f"[AIGIS] Starting URL scan: {url}")
 
     if not re.match(r"^https?://", url):
         return {"status": "error", "reason": "Invalid URL", "url": url}
@@ -90,26 +97,26 @@ def run_url_scan_task(self, url: str, user_id: int = None):
     _write_scan_job(url, "url", "running", user_id)
 
     try:
-        raw_results = dispatch(url)
-        vulnerabilities = parse_vulnerabilities(raw_results)
-        scored = score_vulnerabilities(vulnerabilities)
-        remediated = generate_remediation(scored)
+        raw_results  = dispatch(url)
+        vulns        = parse_vulnerabilities(raw_results)
+        scored       = score_vulnerabilities(vulns)
+        remediated   = generate_remediation(scored)
 
-        report_path = generate_report(
+        report_path  = generate_report(
             job_id=self.request.id,
             vulnerabilities=remediated,
             scan_type="url",
             target=url,
-            user_id=user_id
+            user_id=user_id,
         )
 
         _write_scan_job(url, "url", "completed", user_id)
         logger.info("[AIGIS] URL scan completed")
         return {
-            "status": "completed",
-            "url": url,
-            "report": report_path,
-            "vulnerabilities": len(remediated)
+            "status":          "completed",
+            "url":             url,
+            "report":          report_path,
+            "vulnerabilities": len(remediated),
         }
 
     except Exception as e:
@@ -118,21 +125,22 @@ def run_url_scan_task(self, url: str, user_id: int = None):
         return {"status": "failed", "error": str(e), "url": url}
 
 
-# ── Repository scan ────────────────────────────────────────────────────────────
+# ── Repository scan ───────────────────────────────────────────────────────────
 
 @celery.task(name="backend.workers.tasks.run_repo_scan_task", bind=True)
 def run_repo_scan_task(
-    self, repo_url: str,
+    self,
+    repo_url: str,
     branch: str = "main",
-    user_id: int = None
+    user_id: int = None,
 ):
-    logger.info(f"[AIGIS] Starting repository scan for: {repo_url}")
+    logger.info(f"[AIGIS] Starting repository scan: {repo_url}")
 
     if not re.match(r"^https?://(github|gitlab|bitbucket)\.com/", repo_url):
         return {
-            "status": "error",
-            "reason": "Invalid repository URL.",
-            "repo_url": repo_url
+            "status":   "error",
+            "reason":   "Invalid repository URL.",
+            "repo_url": repo_url,
         }
 
     clone_dir = None
@@ -141,54 +149,53 @@ def run_repo_scan_task(
     try:
         clone_dir = tempfile.mkdtemp(prefix="aigis_repo_")
 
-        clone_result = subprocess.run(
-            ["git", "clone", "--depth", "1",
-             "--branch", branch, repo_url, clone_dir],
-            capture_output=True, text=True, timeout=120
+        result = subprocess.run(
+            ["git", "clone", "--depth", "1", "--branch", branch,
+             repo_url, clone_dir],
+            capture_output=True, text=True, timeout=120,
         )
-
-        if clone_result.returncode != 0:
-            clone_result = subprocess.run(
+        if result.returncode != 0:
+            # Retry without --branch (default branch)
+            result = subprocess.run(
                 ["git", "clone", "--depth", "1", repo_url, clone_dir],
-                capture_output=True, text=True, timeout=120
+                capture_output=True, text=True, timeout=120,
             )
-
-        if clone_result.returncode != 0:
+        if result.returncode != 0:
             _write_scan_job(repo_url, "repository", "failed", user_id)
             return {
-                "status": "error",
-                "reason": f"Git clone failed: {clone_result.stderr.strip()}",
-                "repo_url": repo_url
+                "status":   "error",
+                "reason":   f"Git clone failed: {result.stderr.strip()}",
+                "repo_url": repo_url,
             }
 
         raw_results = dispatch(clone_dir)
-        vulnerabilities = parse_vulnerabilities(raw_results)
-        scored = score_vulnerabilities(vulnerabilities)
-        remediated = generate_remediation(scored)
+        vulns       = parse_vulnerabilities(raw_results)
+        scored      = score_vulnerabilities(vulns)
+        remediated  = generate_remediation(scored)
 
         report_path = generate_report(
             job_id=self.request.id,
             vulnerabilities=remediated,
             scan_type="repository",
             target=repo_url,
-            user_id=user_id
+            user_id=user_id,
         )
 
         _write_scan_job(repo_url, "repository", "completed", user_id)
         logger.info("[AIGIS] Repository scan completed")
         return {
-            "status": "completed",
-            "repo_url": repo_url,
-            "report": report_path,
-            "vulnerabilities": len(remediated)
+            "status":          "completed",
+            "repo_url":        repo_url,
+            "report":          report_path,
+            "vulnerabilities": len(remediated),
         }
 
     except subprocess.TimeoutExpired:
         _write_scan_job(repo_url, "repository", "failed", user_id)
         return {
-            "status": "error",
-            "reason": "Git clone timed out after 120s.",
-            "repo_url": repo_url
+            "status":   "error",
+            "reason":   "Git clone timed out after 120s.",
+            "repo_url": repo_url,
         }
 
     except Exception as e:
@@ -201,15 +208,13 @@ def run_repo_scan_task(
             shutil.rmtree(clone_dir, ignore_errors=True)
 
 
-# ── ZIP scan ───────────────────────────────────────────────────────────────────
+# ── ZIP scan ──────────────────────────────────────────────────────────────────
 
 @celery.task(name="backend.workers.tasks.run_zip_scan_task", bind=True)
 def run_zip_scan_task(self, zip_path: str, user_id: int = None):
-    logger.info(f"[AIGIS] Starting ZIP scan for: {zip_path}")
+    logger.info(f"[AIGIS] Starting ZIP scan: {zip_path}")
 
-    zip_filename = os.path.basename(zip_path)
-    if len(zip_filename) > 37 and zip_filename[36] == "_":
-        zip_filename = zip_filename[37:]
+    zip_filename = _strip_uuid_prefix(os.path.basename(zip_path))
 
     if not os.path.exists(zip_path):
         _write_scan_job(zip_filename, "zip", "failed", user_id)
@@ -225,33 +230,32 @@ def run_zip_scan_task(self, zip_path: str, user_id: int = None):
         if not scannable_files:
             _write_scan_job(zip_filename, "zip", "completed", user_id)
             return {
-                "status": "completed",
-                "zip": zip_path,
-                "report": None,
+                "status":        "completed",
+                "zip":           zip_path,
+                "report":        None,
                 "vulnerabilities": 0,
                 "files_scanned": 0,
                 "message": (
                     "No scannable files found in archive. "
-                    "Supported: .py .js .java .c .cpp .rb .go .php "
+                    "Supported: .py .js .ts .java .c .cpp .rb .go .php "
                     ".exe .elf .bin"
-                )
+                ),
             }
 
-        logger.info(
-            f"[AIGIS] {len(scannable_files)} scannable files found"
-        )
+        logger.info(f"[AIGIS] {len(scannable_files)} scannable file(s) found in zip")
 
         all_vulnerabilities = []
 
         for i, file_path in enumerate(scannable_files):
             filename = os.path.basename(file_path)
             logger.info(
-                f"[AIGIS] Scanning {i+1}/{len(scannable_files)}: {filename}"
+                f"[AIGIS] Scanning file {i+1}/{len(scannable_files)}: {filename}"
             )
             try:
                 raw_results = dispatch(file_path)
-                file_vulns = parse_vulnerabilities(raw_results)
+                file_vulns  = parse_vulnerabilities(raw_results)
 
+                # Tag each finding with its source file inside the zip
                 for vuln in file_vulns:
                     vuln["source_file"] = filename
                     existing_loc = vuln.get("location", "")
@@ -262,18 +266,18 @@ def run_zip_scan_task(self, zip_path: str, user_id: int = None):
                         )
 
                 all_vulnerabilities.extend(file_vulns)
-                logger.info(
-                    f"[AIGIS] {filename}: {len(file_vulns)} vulns"
-                )
+                logger.info(f"[AIGIS] {filename}: {len(file_vulns)} finding(s)")
+
             except Exception as e:
                 logger.warning(f"[AIGIS] Failed to scan {filename}: {e}")
                 continue
 
         logger.info(
-            f"[AIGIS] Total: {len(all_vulnerabilities)} vulnerabilities"
+            f"[AIGIS] ZIP scan total: {len(all_vulnerabilities)} finding(s) "
+            f"across {len(scannable_files)} file(s)"
         )
 
-        scored = score_vulnerabilities(all_vulnerabilities)
+        scored     = score_vulnerabilities(all_vulnerabilities)
         remediated = generate_remediation(scored)
 
         report_path = generate_report(
@@ -281,20 +285,21 @@ def run_zip_scan_task(self, zip_path: str, user_id: int = None):
             vulnerabilities=remediated,
             scan_type="zip",
             target=zip_filename,
-            user_id=user_id
+            user_id=user_id,
         )
 
         _write_scan_job(zip_filename, "zip", "completed", user_id)
         logger.info("[AIGIS] ZIP scan completed")
         return {
-            "status": "completed",
-            "zip": zip_path,
-            "files_scanned": len(scannable_files),
-            "report": report_path,
-            "vulnerabilities": len(remediated)
+            "status":          "completed",
+            "zip":             zip_path,
+            "files_scanned":   len(scannable_files),
+            "report":          report_path,
+            "vulnerabilities": len(remediated),
         }
 
     except ValueError as e:
+        # Safety check failure (zip bomb, ZipSlip, bad archive)
         logger.error(f"[AIGIS] ZIP safety check failed: {e}")
         _write_scan_job(zip_filename, "zip", "failed", user_id)
         return {"status": "error", "reason": str(e), "zip": zip_path}
@@ -307,4 +312,4 @@ def run_zip_scan_task(self, zip_path: str, user_id: int = None):
     finally:
         if extract_dir and os.path.exists(extract_dir):
             shutil.rmtree(extract_dir, ignore_errors=True)
-            logger.info(f"[AIGIS] Cleaned up extract dir")
+            logger.info("[AIGIS] Cleaned up zip extract directory")

@@ -2,44 +2,63 @@ import os
 import re
 
 
-def detect_input_type(target: str):
+def detect_input_type(target: str) -> str:
     """
     Detect the type of scan target.
+
     Returns one of:
-    web | project | python | javascript | java | c_cpp | ruby | go | binary
+        web | zip | project | python | javascript | java |
+        c_cpp | ruby | go | binary
     """
 
-    # Detect URL targets
+    # ── URL ───────────────────────────────────────────────────────────────────
     if isinstance(target, str) and re.match(r"^https?://", target):
         return "web"
 
-    # Detect directories (project scans)
+    # ── Directory (project scan) ───────────────────────────────────────────────
     if os.path.isdir(target):
         return "project"
 
-    # Detect file types
+    # ── File — dispatch by extension ──────────────────────────────────────────
     ext = os.path.splitext(target)[1].lower()
 
     mapping = {
-        ".py": "python",
-        ".js": "javascript",
-        ".ts": "javascript",
-        ".jsx": "javascript",
+        # Archive — must be handled by zip_handler, not binary tools
+        ".zip":  "zip",
+
+        # Python
+        ".py":   "python",
+
+        # JavaScript / TypeScript
+        ".js":   "javascript",
+        ".ts":   "javascript",
+        ".jsx":  "javascript",
+        ".tsx":  "javascript",
+
+        # Java
         ".java": "java",
-        ".c": "c_cpp",
-        ".cpp": "c_cpp",
-        ".cc": "c_cpp",
-        ".h": "c_cpp",
-        ".hpp": "c_cpp",
-        ".rb": "ruby",
-        ".go": "go",
-        ".php": "web",
+
+        # C / C++
+        ".c":    "c_cpp",
+        ".cpp":  "c_cpp",
+        ".cc":   "c_cpp",
+        ".h":    "c_cpp",
+        ".hpp":  "c_cpp",
+
+        # Ruby
+        ".rb":   "ruby",
+
+        # Go
+        ".go":   "go",
+
+        # Web / PHP
+        ".php":  "web",
         ".html": "web",
-        ".htm": "web",
+        ".htm":  "web",
     }
 
     if ext in mapping:
         return mapping[ext]
 
-    # Default fallback
+    # ── Default: treat as binary ───────────────────────────────────────────────
     return "binary"
