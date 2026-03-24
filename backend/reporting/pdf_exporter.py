@@ -32,6 +32,7 @@ SCAN_TYPE_LABELS = {
     "file":       "File Scan",
     "url":        "URL Scan",
     "repository": "Repository Scan",
+    "zip":        "ZIP Archive Scan",
 }
 
 

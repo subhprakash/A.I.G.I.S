@@ -4,13 +4,12 @@ from slowapi.util import get_remote_address
 import os
 import uuid
 
-from backend.workers.tasks import run_scan_task
+from backend.workers.tasks import run_scan_task, run_zip_scan_task
 from backend.auth.dependencies import get_current_user
 
 router = APIRouter(prefix="/scan", tags=["scan"])
 
 UPLOAD_DIR = "/app/uploads"
-
 limiter = Limiter(key_func=get_remote_address)
 
 
@@ -22,7 +21,6 @@ async def upload_file(
     current_user=Depends(get_current_user)
 ):
     os.makedirs(UPLOAD_DIR, exist_ok=True)
-
     job_id = str(uuid.uuid4())
     file_path = f"{UPLOAD_DIR}/{job_id}_{file.filename}"
 
@@ -44,6 +42,53 @@ async def upload_file(
     }
 
 
+@router.post("/upload/zip")
+@limiter.limit("5/minute")
+async def upload_zip(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user)
+):
+    """
+    Upload a .zip archive for scanning.
+    Each file inside is extracted safely and scanned individually.
+    All findings aggregated into one PDF report.
+    Safety: 500 MB limit, 100 file limit, ZipSlip blocked.
+    """
+    if not file.filename.lower().endswith(".zip"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Only .zip files are accepted here. "
+                "For individual files use /api/scan/upload."
+            )
+        )
+
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    job_id = str(uuid.uuid4())
+    file_path = f"{UPLOAD_DIR}/{job_id}_{file.filename}"
+
+    with open(file_path, "wb") as buffer:
+        buffer.write(await file.read())
+
+    run_zip_scan_task.apply_async(
+        args=[file_path],
+        kwargs={"user_id": current_user.id},
+        task_id=job_id
+    )
+
+    return {
+        "filename": file.filename,
+        "stored_path": file_path,
+        "job_id": job_id,
+        "status": "scan_started",
+        "message": (
+            f"ZIP scan queued. "
+            f"Poll /api/scan/status/{job_id} for results."
+        )
+    }
+
+
 @router.delete("/cancel/{job_id}")
 async def cancel_scan(
     job_id: str,
@@ -53,15 +98,12 @@ async def cancel_scan(
     from backend.workers.celery_app import celery
 
     result = AsyncResult(job_id, app=celery)
-
     if result.state in ("SUCCESS", "FAILURE"):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Cannot cancel a task that has already {result.state.lower()}."
+            detail=f"Cannot cancel — task already {result.state.lower()}."
         )
-
     result.revoke(terminate=True, signal="SIGTERM")
-
     return {
         "job_id": job_id,
         "status": "cancelled",
