@@ -154,3 +154,5 @@ As shown in the dashboard table, the mapping directly follows the official CVSS 
 * *Critical (9.0 – 10.0):* The "drop everything and fix this now" vulnerabilities. These are typically exploitable remotely over the internet by anonymous attackers, require zero user interaction, and result in total system compromise.
 
 When the underlying tools (like Bandit, Semgrep, or Nikto) find a flaw, they assign it a base CVSS score. The pipeline catches that number, drops it into the correct severity bucket for human readability, and uses it to calculate your overall Threat Level percentage.
+
+---
