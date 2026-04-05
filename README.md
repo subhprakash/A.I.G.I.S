@@ -25,12 +25,27 @@ A.I.G.I.S is a containerized, strictly local, AI-powered security analysis pipel
 <br>
 
 As permitted in the assignment instructions, I am submitting the backend for a recently developed project: **A.I.G.I.S**. While the application domain is Cybersecurity rather than a Finance Dashboard, the system's architecture was designed to solve the exact same technical challenges outlined in the assessment rubric.
+As permitted in the assignment instructions (*"If you have already built a similar backend project earlier, you may submit that project"*), I am submitting the backend for a recently developed application: **A.I.G.I.S**. 
 
-* **1. User & Role Management (RBAC):** Handled natively in `backend/auth_routes.py` and `rbac.py`. The first user is automatically assigned an Admin role, while subsequent users default to standard access.
-* **2. Records Management (CRUD):** Manages complex Scan Jobs and Vulnerability Reports with full CRUD operations via `backend/api/scan_routes.py` and `report_routes.py`.
-* **3. Dashboard Summary APIs (Aggregation):** Implemented in `backend/api/admin_routes.py` (`/dashboard/summary`), utilizing native SQLAlchemy aggregations (`func.sum`, `func.count`, `group_by`) to dynamically calculate total system vulnerabilities and severity breakdowns.
-* **4. Access Control Logic & Validation:** Endpoints are secured using JWT dependencies, and strict input validation is enforced using Pydantic schemas. 
-* **5. Advanced Architecture:** Built with FastAPI, PostgreSQL, Celery, and Redis for asynchronous task processing, fully containerized via Docker.
+While the domain is Cybersecurity rather than a Finance Dashboard, the system architecture was intentionally designed to solve the exact same technical engineering challenges outlined in your assessment rubric. Below is a detailed mapping of how this codebase fulfills and exceeds the core requirements:
+
+* **1. User and Role Management (RBAC):** * *Finance Rubric:* Requires Admin, Analyst, and Viewer roles. 
+  * *A.I.G.I.S Equivalent:* The system utilizes a robust JWT-based Role-Based Access Control system (`backend/auth_routes.py` and `rbac.py`). The first user to register is dynamically bootstrapped as the system `Admin` (with full access to system-wide dashboards and user deletion). Subsequent users are assigned standard roles, ensuring they can only interact with their own isolated data.
+
+* **2. Financial Records Management (CRUD):** * *Finance Rubric:* Manage records with fields like amount, type, date, and category.
+  * *A.I.G.I.S Equivalent:* Instead of financial transactions, the "records" in this system are complex **Scan Jobs** and **Vulnerability Reports**. Just like a transaction, these records have distinct types (`scan_type`), measurable values (`vulnerability_count`, `threat_score`), categories (`highest_severity`), and timestamps. Full CRUD operations are seamlessly handled via `backend/api/scan_routes.py` and `report_routes.py`.
+
+* **3. Dashboard Summary APIs (Aggregation):** * *Finance Rubric:* Provide endpoints returning aggregated data like total income or category-wise totals.
+  * *A.I.G.I.S Equivalent:* Implemented via the `/api/admin/dashboard/summary` endpoint in `backend/api/admin_routes.py`. Instead of pulling raw data into application memory, it demonstrates efficient database query design by utilizing native **SQLAlchemy aggregations** (`func.sum`, `func.count`, and `.group_by()`) to dynamically calculate system-wide vulnerability totals, status breakdowns, and severity distributions.
+
+* **4. Access Control Logic:** * *Finance Rubric:* Clearly enforce which type of user can perform which action.
+  * *A.I.G.I.S Equivalent:* Route protection is strictly enforced using FastAPI Dependency Injection. Custom middleware, such as `@Depends(require_role("admin"))`, actively intercepts requests at the API boundary, parses the JWT payload, and blocks unauthorized actions with standard `401 Unauthorized` or `403 Forbidden` responses.
+
+* **5. Validation and Error Handling:** * *Finance Rubric:* Handle incorrect input and protect against invalid operations.
+  * *A.I.G.I.S Equivalent:* Demonstrates enterprise-grade validation. **Pydantic** `field_validators` are used to sanitize URLs and protect against Server-Side Request Forgery (SSRF) by blocking private IP ranges. Furthermore, file uploads (`/upload/zip`) are strictly validated and capped at 500MB to prevent **Zip Bomb** memory exhaustion, and path traversal checks prevent **ZipSlip** attacks during extraction.
+
+* **6. Data Persistence & Advanced Architecture:** * *Finance Rubric:* Use a relational database and show thoughtful backend design.
+  * *A.I.G.I.S Equivalent:* The system uses **PostgreSQL** modeled via **SQLAlchemy ORM**. Moving beyond basic synchronous CRUD operations, this architecture demonstrates cloud-native scalability. Heavy data processing (running external security tools and compiling PDFs) is decoupled from the main API thread and offloaded to asynchronous background workers using **Celery** and **Redis**, with the entire stack orchestrated via **Docker**.
 
 </details>
 
