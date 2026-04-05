@@ -18,7 +18,23 @@
 A.I.G.I.S is a containerized, strictly local, AI-powered security analysis pipeline. It bridges the gap between writing code and securing code by automating static analysis (SAST), malware detection, and web vulnerability scanning. It translates cryptic security tool outputs into plain-English, actionable remediation steps using a local LLM, compiling everything into a clean Executive PDF Report.
 
 **Zero configuration. Zero privacy leaks. Zero cost.**
+<br>
 
+<details>
+<summary><b>👋 Note to Reviewers: Finance Backend Assignment Mapping (Click to Expand)</b></summary>
+<br>
+
+As permitted in the assignment instructions, I am submitting the backend for a recently developed project: **A.I.G.I.S**. While the application domain is Cybersecurity rather than a Finance Dashboard, the system's architecture was designed to solve the exact same technical challenges outlined in the assessment rubric.
+
+* **1. User & Role Management (RBAC):** Handled natively in `backend/auth_routes.py` and `rbac.py`. The first user is automatically assigned an Admin role, while subsequent users default to standard access.
+* **2. Records Management (CRUD):** Manages complex Scan Jobs and Vulnerability Reports with full CRUD operations via `backend/api/scan_routes.py` and `report_routes.py`.
+* **3. Dashboard Summary APIs (Aggregation):** Implemented in `backend/api/admin_routes.py` (`/dashboard/summary`), utilizing native SQLAlchemy aggregations (`func.sum`, `func.count`, `group_by`) to dynamically calculate total system vulnerabilities and severity breakdowns.
+* **4. Access Control Logic & Validation:** Endpoints are secured using JWT dependencies, and strict input validation is enforced using Pydantic schemas. 
+* **5. Advanced Architecture:** Built with FastAPI, PostgreSQL, Celery, and Redis for asynchronous task processing, fully containerized via Docker.
+
+</details>
+
+<br>
 ---
 
 ## ✨ Key Features
