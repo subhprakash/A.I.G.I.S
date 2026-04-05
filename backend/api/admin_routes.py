@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
+from sqlalchemy import func  # <-- Add this line
 import os
 
 from backend.database.database import get_db
@@ -129,3 +130,42 @@ def list_all_scans(
         result.append({"username": "unassigned", "scans": unassigned})
 
     return result
+
+@router.get("/dashboard/summary")
+def get_dashboard_summary(
+    db: Session = Depends(get_db),
+    admin=Depends(require_role("admin"))
+):
+    """
+    Returns aggregated system-wide analytics for the admin dashboard.
+    Demonstrates database-level aggregation (COUNT, SUM, GROUP BY) 
+    to fulfill the 'Dashboard Summary APIs' assignment requirement.
+    """
+    # 1. Total Users Calculation
+    total_users = db.query(User).count()
+
+    # 2. Total Scans and Status Breakdown (Group By)
+    total_scans = db.query(ScanJob).count()
+    scans_by_status = db.query(
+        ScanJob.status, func.count(ScanJob.id)
+    ).group_by(ScanJob.status).all()
+
+    # 3. Vulnerability Metrics (Sum and Group By)
+    total_vulns = db.query(func.sum(Report.vulnerability_count)).scalar() or 0
+    reports_by_severity = db.query(
+        Report.highest_severity, func.count(Report.id)
+    ).group_by(Report.highest_severity).all()
+
+    return {
+        "overview": {
+            "total_users": total_users,
+            "total_scans_run": total_scans,
+            "total_vulnerabilities_detected": int(total_vulns)
+        },
+        "scans_by_status": {
+            status: count for status, count in scans_by_status if status
+        },
+        "reports_by_highest_severity": {
+            severity: count for severity, count in reports_by_severity if severity
+        }
+    }

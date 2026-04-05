@@ -42,6 +42,29 @@ def _strip_uuid_prefix(filename: str) -> str:
     return filename
 
 
+# ── UI Formatter Helper ───────────────────────────────────────────────────────
+def _format_vulns_for_ui(remediated):
+    """Formats the raw vulnerabilities array into the structured list expected by the React/Streamlit UI."""
+    formatted = []
+    for v in remediated:
+        loc = str(v.get("location", ""))
+        file_part = loc.split(":")[0] if loc else "Unknown"
+        line_part = loc.split(":")[-1] if ":" in loc else "?"
+        
+        # We include CWE here so the OWASP Radar Chart can plot it!
+        formatted.append({
+            "title": v.get("test_id", "Vulnerability"),
+            "severity": v.get("cvss_rating", "Unknown"),
+            "file": file_part,
+            "line": line_part,
+            "snippet": v.get("description", "No snippet available."),
+            "language": "auto",
+            "description": v.get("description", "No description available."),
+            "remediation": v.get("remediation", "No remediation available."),
+            "cwe": v.get("cwe", "CWE-200") # Fallback to CWE-200 (Information Exposure) if missing
+        })
+    return formatted
+
 # ── File scan ─────────────────────────────────────────────────────────────────
 
 @celery.task(name="backend.workers.tasks.run_scan_task", bind=True)
@@ -73,10 +96,12 @@ def run_scan_task(self, file_path: str, user_id: int = None):
         _write_scan_job(filename, "file", "completed", user_id)
         logger.info("[AIGIS] File scan completed")
         return {
-            "status":          "completed",
-            "file":            file_path,
-            "report":          report_path,
-            "vulnerabilities": len(remediated),
+            "status":               "completed",
+            "file":                 file_path,
+            "report":               report_path,
+            "vulnerabilities":      len(remediated),
+            "vulnerabilities_list": _format_vulns_for_ui(remediated),
+            "dependencies":         [] # Can be populated later by a real SBOM tool like Syft
         }
 
     except Exception as e:
@@ -113,10 +138,12 @@ def run_url_scan_task(self, url: str, user_id: int = None):
         _write_scan_job(url, "url", "completed", user_id)
         logger.info("[AIGIS] URL scan completed")
         return {
-            "status":          "completed",
-            "url":             url,
-            "report":          report_path,
-            "vulnerabilities": len(remediated),
+            "status":               "completed",
+            "url":                  url,
+            "report":               report_path,
+            "vulnerabilities":      len(remediated),
+            "vulnerabilities_list": _format_vulns_for_ui(remediated),
+            "dependencies":         []
         }
 
     except Exception as e:
@@ -184,10 +211,12 @@ def run_repo_scan_task(
         _write_scan_job(repo_url, "repository", "completed", user_id)
         logger.info("[AIGIS] Repository scan completed")
         return {
-            "status":          "completed",
-            "repo_url":        repo_url,
-            "report":          report_path,
-            "vulnerabilities": len(remediated),
+            "status":               "completed",
+            "repo_url":             repo_url,
+            "report":               report_path,
+            "vulnerabilities":      len(remediated),
+            "vulnerabilities_list": _format_vulns_for_ui(remediated),
+            "dependencies":         []
         }
 
     except subprocess.TimeoutExpired:
@@ -291,11 +320,13 @@ def run_zip_scan_task(self, zip_path: str, user_id: int = None):
         _write_scan_job(zip_filename, "zip", "completed", user_id)
         logger.info("[AIGIS] ZIP scan completed")
         return {
-            "status":          "completed",
-            "zip":             zip_path,
-            "files_scanned":   len(scannable_files),
-            "report":          report_path,
-            "vulnerabilities": len(remediated),
+            "status":               "completed",
+            "zip":                  zip_path,
+            "files_scanned":        len(scannable_files),
+            "report":               report_path,
+            "vulnerabilities":      len(remediated),
+            "vulnerabilities_list": _format_vulns_for_ui(remediated),
+            "dependencies":         []
         }
 
     except ValueError as e:

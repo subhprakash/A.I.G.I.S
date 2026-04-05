@@ -3,6 +3,7 @@ import requests
 import time
 import pandas as pd
 import json
+import plotly.express as px # <-- NEW IMPORT FOR TREEMAP
 
 BACKEND_URL = "http://backend:8000"
 
@@ -10,7 +11,7 @@ BACKEND_URL = "http://backend:8000"
 def auth_headers():
     return {"Authorization": f"Bearer {st.session_state.token}"}
 
-# ── ENGINE MAPPING & BADGE UI ─────────────────────────────────────────────────
+# ── ENGINE MAPPING & ANIMATED BADGE UI ────────────────────────────────────────
 
 TOOL_MAPPING = {
     "Python": ["Bandit", "Semgrep", "Pylint", "Safety"],
@@ -28,7 +29,7 @@ TOOL_MAPPING = {
 
 def display_active_engines(scan_type: str, language: str = None):
     """
-    Renders a sleek UI block showing the active tools for the selected scan.
+    Renders a sleek UI block showing the active tools with an animated glowing pulse.
     """
     if scan_type == "File" and language:
         tools = TOOL_MAPPING.get(language, ["Semgrep (Fallback)"])
@@ -39,75 +40,109 @@ def display_active_engines(scan_type: str, language: str = None):
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown("**⚙️ Engines Armed for this Scan:**")
         
-        html_badges = ""
-        for tool in tools:
-            html_badges += f"""
-            <span style="
+        # Added CSS animation for a subtle glowing pulse
+        html_badges = """
+        <style>
+            @keyframes pulse-glow {
+                0% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.4); }
+                70% { box-shadow: 0 0 0 6px rgba(56, 189, 248, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(56, 189, 248, 0); }
+            }
+            .animated-badge {
                 display: inline-block;
-                background-color: #1E293B;
+                background-color: rgba(30, 41, 59, 0.7);
                 color: #38BDF8;
-                padding: 4px 12px;
-                border-radius: 16px;
+                padding: 6px 14px;
+                border-radius: 20px;
                 font-size: 13px;
                 font-weight: 600;
-                margin-right: 8px;
-                margin-bottom: 8px;
-                border: 1px solid #0369A1;
-            ">{tool}</span>
-            """
+                margin-right: 10px;
+                margin-bottom: 10px;
+                border: 1px solid rgba(3, 105, 161, 0.5);
+                backdrop-filter: blur(4px);
+                animation: pulse-glow 2s infinite;
+            }
+        </style>
+        """
+        for tool in tools:
+            html_badges += f'<span class="animated-badge">{tool}</span>'
+            
         st.markdown(html_badges, unsafe_allow_html=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
-# ── Visual components ──────────────────────────────────────────────────────────
+# ── GLASSMORPHISM Visual components ────────────────────────────────────────────
 
 def show_dual_speedometers(score: int, vuln_count: int):
-    t_color = (
-        "#ff4b4b" if score > 70
-        else "#ffa500" if score > 40
-        else "#00cc66"
-    )
-    v_color = (
-        "#ff4b4b" if vuln_count > 7
-        else "#ffa500" if vuln_count > 3
-        else "#00cc66"
-    )
+    # Determine colors based on threat level
+    t_color = "#ef4444" if score > 70 else "#f59e0b" if score > 40 else "#10b981"
+    t_glow = "rgba(239, 68, 68, 0.2)" if score > 70 else "rgba(245, 158, 11, 0.2)" if score > 40 else "rgba(16, 185, 129, 0.2)"
+    
+    v_color = "#ef4444" if vuln_count > 7 else "#f59e0b" if vuln_count > 3 else "#10b981"
+    v_glow = "rgba(239, 68, 68, 0.2)" if vuln_count > 7 else "rgba(245, 158, 11, 0.2)" if vuln_count > 3 else "rgba(16, 185, 129, 0.2)"
+    
+    # Custom CSS for Glassmorphism (Frosted Glass) effect
+    glass_css = """
+    <style>
+        .glass-card {
+            background: rgba(17, 25, 40, 0.45);
+            border-radius: 16px;
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 25px;
+            text-align: center;
+            color: white;
+            transition: transform 0.3s ease;
+        }
+        .glass-card:hover {
+            transform: translateY(-5px);
+        }
+        .glass-label {
+            margin: 0;
+            font-weight: 600;
+            color: #94a3b8;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 1px;
+        }
+        .glass-value {
+            margin: 15px 0;
+            font-size: 3.2rem;
+            font-weight: 700;
+            text-shadow: 0 0 20px {glow};
+        }
+        .glass-bar-bg {
+            width: 100%;
+            background-color: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+    </style>
+    """
+    st.markdown(glass_css, unsafe_allow_html=True)
+
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"""
-            <div style="border:1px solid #3d425c;border-radius:15px;
-                        padding:20px;text-align:center;
-                        background-color:#1e2130;color:white;">
-                <p style="margin:0;font-weight:bold;color:#aaa;
-                          text-transform:uppercase;font-size:0.8rem;">
-                    Threat Level
-                </p>
-                <h1 style="color:{t_color};margin:10px 0;font-size:2.8rem;">
-                    {score}%
-                </h1>
-                <div style="width:100%;background-color:#333;
-                            border-radius:10px;height:12px;">
-                    <div style="width:{score}%;background-color:{t_color};
-                                height:12px;border-radius:10px;"></div>
+            <div class="glass-card">
+                <p class="glass-label">Threat Level</p>
+                <h1 class="glass-value" style="color:{t_color}; text-shadow: 0 0 20px {t_glow};">{score}%</h1>
+                <div class="glass-bar-bg">
+                    <div style="width:{score}%; background-color:{t_color}; height:8px; border-radius:10px; box-shadow: 0 0 10px {t_color};"></div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
     with col2:
         v_width = min(vuln_count * 10, 100)
         st.markdown(f"""
-            <div style="border:1px solid #3d425c;border-radius:15px;
-                        padding:20px;text-align:center;
-                        background-color:#1e2130;color:white;">
-                <p style="margin:0;font-weight:bold;color:#aaa;
-                          text-transform:uppercase;font-size:0.8rem;">
-                    Vulnerabilities Found
-                </p>
-                <h1 style="color:{v_color};margin:10px 0;font-size:2.8rem;">
-                    {vuln_count}
-                </h1>
-                <div style="width:100%;background-color:#333;
-                            border-radius:10px;height:12px;">
-                    <div style="width:{v_width}%;background-color:{v_color};
-                                height:12px;border-radius:10px;"></div>
+            <div class="glass-card">
+                <p class="glass-label">Vulnerabilities Found</p>
+                <h1 class="glass-value" style="color:{v_color}; text-shadow: 0 0 20px {v_glow};">{vuln_count}</h1>
+                <div class="glass-bar-bg">
+                    <div style="width:{v_width}%; background-color:{v_color}; height:8px; border-radius:10px; box-shadow: 0 0 10px {v_color};"></div>
                 </div>
             </div>
         """, unsafe_allow_html=True)
@@ -299,11 +334,11 @@ def _show_download_button(job_id: str):
         st.warning(f"Could not fetch report: {e}")
 
 
-# ── Active job banner ──────────────────────────────────────────────────────────
+# ── Animated Active job banner ─────────────────────────────────────────────────
 
 def show_active_jobs_banner():
     """
-    Shows a banner on any page if a scan is still running in the background.
+    Shows an animated banner on any page if a scan is still running in the background.
     """
     active_jobs = _get_active_jobs()
     if not active_jobs:
@@ -328,11 +363,14 @@ def show_active_jobs_banner():
             _clear_active_job(scan_type)
 
         elif status in ("pending", "running"):
-            st.info(
-                f"⏳ **{scan_type.upper()} scan running in background** "
-                f"— Job `{job_id[:8]}`. "
-                f"Navigate to the scan page to see progress."
-            )
+            # Animated spinner for active background jobs
+            st.markdown(f"""
+                <div style="border-left: 4px solid #f59e0b; background-color: rgba(245, 158, 11, 0.1); padding: 12px; border-radius: 4px; display: flex; align-items: center; margin-bottom: 15px;">
+                    <div style="border: 3px solid rgba(245, 158, 11, 0.3); border-top: 3px solid #f59e0b; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; margin-right: 15px;"></div>
+                    <style>@keyframes spin {{ 0% {{ transform: rotate(0deg); }} 100% {{ transform: rotate(360deg); }} }}</style>
+                    <span style="color: #fcd34d;"><b>{scan_type.upper()} scan running in background</b> — Job <code>{job_id[:8]}</code>. Navigate to the scan page to see progress.</span>
+                </div>
+            """, unsafe_allow_html=True)
 
 
 # ── Shared page functions ──────────────────────────────────────────────────────
@@ -657,16 +695,59 @@ def page_my_reports():
         elif resp.status_code == 200:
             reports = resp.json()
             if not reports:
-                st.info(
-                    "No reports yet. "
-                    "Run a scan to generate your first report."
-                )
+                # --- ZERO DATA EMPTY STATE ---
+                st.markdown("<br>", unsafe_allow_html=True)
+                col_img, col_txt = st.columns([1, 4])
+                with col_img:
+                    st.markdown("<h1 style='text-align:center; font-size:4rem;'>📭</h1>", unsafe_allow_html=True)
+                with col_txt:
+                    st.subheader("Your dashboard is looking a little empty!")
+                    st.markdown(
+                        "You haven't run any security scans yet. Head over to the **Overview** page "
+                        "and launch your first File, URL, ZIP, or Repository scan to populate this area with rich data."
+                    )
                 return
 
-            st.caption(f"Total reports: **{len(reports)}**")
+            st.caption(f"Total reports in database: **{len(reports)}**")
 
-            # History chart
-            if len(reports) > 1:
+            # --- 🔍 GLOBAL SEARCH & FILTER BAR ---
+            st.markdown("### 🔍 Filter Reports")
+            col_search, col_type, col_sev = st.columns([2, 1, 1])
+            
+            with col_search:
+                search_query = st.text_input("Search by Target...", placeholder="e.g., app.py or example.com")
+            
+            with col_type:
+                unique_types = list(set(r.get("scan_type", "unknown").upper() for r in reports))
+                filter_type = st.selectbox("Scan Type", ["All"] + unique_types)
+            
+            with col_sev:
+                filter_sev = st.selectbox("Highest Severity", ["All", "Critical", "High", "Medium", "Low", "Info", "None"])
+
+            # Apply filters
+            filtered_reports = []
+            for r in reports:
+                # 1. Check Scan Type
+                if filter_type != "All" and r.get("scan_type", "").upper() != filter_type:
+                    continue
+                # 2. Check Severity
+                if filter_sev != "All" and r.get("highest_severity", "none").capitalize() != filter_sev:
+                    continue
+                # 3. Check Search Query
+                if search_query:
+                    target = r.get("target", "").lower()
+                    if search_query.lower() not in target:
+                        continue
+                filtered_reports.append(r)
+
+            st.markdown("---")
+
+            if not filtered_reports:
+                st.warning("No reports match your current filter criteria.")
+                return
+
+            # History chart (Now uses Filtered Data)
+            if len(filtered_reports) > 1:
                 st.markdown("### 📈 Vulnerability History")
                 df_chart = pd.DataFrame([
                     {
@@ -676,14 +757,14 @@ def page_my_reports():
                         ),
                         "Vulnerabilities": r.get("vulnerability_count", 0),
                     }
-                    for r in reversed(reports)
+                    for r in reversed(filtered_reports)
                 ])
                 st.bar_chart(
                     df_chart.set_index("Scan")["Vulnerabilities"]
                 )
 
-            # History table
-            st.markdown("### 📋 Scan History")
+            # History table (Now uses Filtered Data)
+            st.markdown(f"### 📋 Scan History ({len(filtered_reports)} matching)")
             sev_icons = {
                 "critical": "🔴", "high": "🟠", "medium": "🟡",
                 "low": "🟢", "info": "🔵", "none": "⚪",
@@ -702,15 +783,15 @@ def page_my_reports():
                         r.get("highest_severity", "none").capitalize()
                     ),
                 }
-                for r in reports
+                for r in filtered_reports
             ])
             st.dataframe(
                 df_table, use_container_width=True, hide_index=True
             )
 
-            # Download section
+            # Download section (Now uses Filtered Data)
             st.markdown("### 📥 Download Reports")
-            for r in reports:
+            for r in filtered_reports:
                 job_id = r.get("job_id", "")
                 scan_type = r.get("scan_type", "file").upper()
                 target = r.get("target", "N/A")
@@ -731,7 +812,7 @@ def page_my_reports():
                             st.download_button(
                                 label="📥 Download PDF",
                                 data=dl_resp.content,
-                                file_name=f"AIGIS_{job_id[:8]}.pdf",
+                                file_name=f"AIGIS_Report_{job_id[:8]}.pdf",
                                 mime="application/pdf",
                                 key=f"dl_{job_id}"
                             )
@@ -745,16 +826,63 @@ def page_my_reports():
         st.error("Cannot connect to backend.")
     except Exception as e:
         st.error(f"Error: {e}")
-
-
 # ── Main show ──────────────────────────────────────────────────────────────────
 
 def show():
-    st.title("🛡️ A.I.G.I.S Security Hub")
-    st.caption(
-        f"Welcome, **{st.session_state.username}** — "
-        "Autonomous Intelligence & Guard Inspection System"
-    )
+    # Hide standard Streamlit header/footer for a cleaner SaaS look
+    st.markdown("""
+        <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            header {visibility: hidden;}
+            
+            /* Custom CSS for the Overview Dashboard */
+            .hero-title {
+                font-size: 3.2rem;
+                font-weight: 800;
+                background: -webkit-linear-gradient(45deg, #00ff41, #03a9f4);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                margin-bottom: 0px;
+                padding-bottom: 10px;
+            }
+            .hero-subtitle {
+                font-size: 1.2rem;
+                color: #94a3b8;
+                margin-bottom: 40px;
+            }
+            .nav-card {
+                background: rgba(30, 41, 59, 0.5);
+                border: 1px solid rgba(255, 255, 255, 0.05);
+                padding: 25px;
+                border-radius: 12px;
+                text-align: left;
+                transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+                margin-bottom: 15px;
+            }
+            .nav-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 10px 20px rgba(0, 255, 65, 0.05);
+                border-color: rgba(0, 255, 65, 0.4);
+            }
+            .card-icon {
+                font-size: 2.5rem;
+                margin-bottom: 15px;
+                display: block;
+            }
+            .card-title {
+                font-size: 1.4rem;
+                font-weight: 700;
+                color: #f8fafc;
+                margin-bottom: 8px;
+            }
+            .card-text {
+                color: #94a3b8;
+                font-size: 0.95rem;
+                line-height: 1.5;
+            }
+        </style>
+    """, unsafe_allow_html=True)
 
     show_active_jobs_banner()
 
@@ -781,28 +909,73 @@ def show():
     st.query_params["page"] = page
 
     if page == "🏠 Overview":
-        st.subheader("Welcome to A.I.G.I.S")
-        st.markdown("""
-        A.I.G.I.S uses **Llama 3** and **static analysis** to secure
-        your code and infrastructure.
+        # --- HERO SECTION ---
+        st.markdown(f'<div class="hero-title">A.I.G.I.S Command Center</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="hero-subtitle">Welcome back, <b>{st.session_state.username}</b>. Select a target vector to deploy autonomous security analysis.</div>', unsafe_allow_html=True)
 
-        **What you can scan:**
-        - 📁 **Files** — Python, JS, Java, C/C++, Go, Ruby, PHP, Binaries
-        - 🗜️ **ZIPs** — Archives up to 500MB, up to 100 files
-        - 🌐 **URLs** — nikto, nmap, whatweb, wafw00f
-        - 📦 **Repos** — semgrep, gitleaks, trufflehog
+        # --- NAVIGATION GRID ---
+        col1, col2 = st.columns(2)
 
-        **How it works:**
-        1. Submit your target
-        2. Tools run in an isolated Docker sandbox
-        3. CVSS v3.1 scoring on every finding
-        4. Llama 3 generates plain-English fixes
-        5. PDF report generated and ready to download
-        """)
-        col1, col2, col3 = st.columns(3)
-        col1.info("🔒 Isolated Docker sandbox")
-        col2.info("🤖 Llama 3 (local, private)")
-        col3.info("📄 PDF report every scan")
+        with col1:
+            st.markdown("""
+                <div class="nav-card">
+                    <span class="card-icon">📁</span>
+                    <div class="card-title">Static File Analysis</div>
+                    <div class="card-text">Deep code inspection for Python, JS, Java, and binaries. Detect vulnerabilities before execution.</div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Launch File Scan ➔", use_container_width=True, type="secondary"):
+                st.query_params["page"] = "📁 File Scan"
+                st.rerun()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            st.markdown("""
+                <div class="nav-card">
+                    <span class="card-icon">🌐</span>
+                    <div class="card-title">URL & Web Application Scan</div>
+                    <div class="card-text">Perform dynamic active testing (DAST) on live web applications, APIs, and open server ports.</div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Launch URL Scan ➔", use_container_width=True, type="secondary"):
+                st.query_params["page"] = "🌐 URL Scan"
+                st.rerun()
+
+        with col2:
+            st.markdown("""
+                <div class="nav-card">
+                    <span class="card-icon">🗜️</span>
+                    <div class="card-title">ZIP Archive Scan</div>
+                    <div class="card-text">Upload a compressed project directory. A.I.G.I.S extracts and recursively scans all internal files.</div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Launch ZIP Scan ➔", use_container_width=True, type="secondary"):
+                st.query_params["page"] = "🗜️ ZIP Scan"
+                st.rerun()
+
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            st.markdown("""
+                <div class="nav-card">
+                    <span class="card-icon">📦</span>
+                    <div class="card-title">Repository Scan</div>
+                    <div class="card-text">Connect to public GitHub or GitLab repositories to scan commit history for leaked secrets and keys.</div>
+                </div>
+            """, unsafe_allow_html=True)
+            if st.button("Launch Repo Scan ➔", use_container_width=True, type="secondary"):
+                st.query_params["page"] = "📦 Repository Scan"
+                st.rerun()
+
+        # --- BOTTOM ACTION BAR ---
+        st.markdown("---")
+        st.markdown("### 📊 Security Dashboard & History")
+        st.markdown("Review your past scans, download PDF reports, and check your OWASP compliance matrix.")
+        
+        _, col_center, _ = st.columns([1, 2, 1])
+        with col_center:
+            if st.button("View My Reports", type="primary", use_container_width=True):
+                st.query_params["page"] = "📜 My Reports"
+                st.rerun()
 
     elif page == "📁 File Scan":
         page_file_scan()
